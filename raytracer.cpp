@@ -60,7 +60,7 @@ public:
           , origin(orig)
           , material(mat) { }
 
-     double intersect(const Ray &ray) const {
+     optional<double> intersect(const Ray &ray) const {
           auto op = this->origin - ray.origin;
           double epsilon = 1e-4;
           double b = op.dot(ray.direction);
@@ -68,7 +68,7 @@ public:
           double descriminant = b*b - op.dot(op) + r2;
 
           if (descriminant < 0) {
-               return 0;
+               return {};
           }
 
           descriminant = sqrt(descriminant);
@@ -80,7 +80,7 @@ public:
                return b + descriminant;
           }
 
-          return 0;
+          return {};
      }
 
      double get_radius() const {
@@ -173,10 +173,14 @@ const optional<pair<double, vector<Sphere>::const_iterator>> intersect(const Ray
                                                                        const vector<Sphere>& spheres) {
      double inf = std::numeric_limits<double>::infinity();
      double nearest_distance = inf;
-     auto nearest_sphere = spheres.cend();
+     auto nearest_sphere = spheres.end();
 
      for (auto it=spheres.begin(); it != spheres.end(); it++) {
-          double distance = it->intersect(ray);
+          auto hit_check = it->intersect(ray);
+          if (!hit_check.has_value()) {
+               continue;
+          }
+          double distance = hit_check.value();
           if (distance < nearest_distance) {
                nearest_sphere = it;
                nearest_distance = distance;
