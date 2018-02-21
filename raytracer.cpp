@@ -204,12 +204,15 @@ Color radiance(const Ray& ray, int depth, default_random_engine rand) {
      vector<Sphere>::const_iterator sphere;
      tie(distance, sphere) = hit_check.value();
 
+     if (depth > 10) {
+          return Vector3d(0, 0, 0);
+     }
+
      Vector3d intersect_point = ray.origin + ray.direction * distance;
      Vector3d normal = (intersect_point - sphere->get_origin()).normalized();
      Vector3d oriented_normal = normal.dot(ray.direction) < 0 ? normal : -normal;
 
      Material mat = sphere->get_material();
-
      Color f = mat.get_color();
 
      // this might be slow...
@@ -256,20 +259,23 @@ Color radiance(const Ray& ray, int depth, default_random_engine rand) {
           }
 
           // fresnel math makes me sad
-          Vector3d tdir = (ray.direction * nnt - normal*((into?1:-1)*(ddn * nnt * sqrt(cos2t)))).normalized();
+          Vector3d tdir = (ray.direction*nnt - normal*((into?1:-1)*(ddn*nnt+sqrt(cos2t)))).normalized();
           Ray trans_ray(intersect_point, tdir);
-          double a=nt - nc, b=nt + nc, R0 = (a*a)/(b*b), c = 1-(into?-ddn:tdir.dot(normal));
+          double a=nt-nc, b=nt+nc, R0=(a*a)/(b*b), c=1-(into?-ddn:tdir.dot(normal));
           // TODO: Make this less awful
           double Re=R0+(1-R0)*pow(c, 5), Tr=1-Re, P=.25+.5*Re, RP=Re/P, TP=Tr/(1-P);
+
+          Color result;
           if (depth > 2) {
                if (uniform_rand(rand) < P) {
-                    return mat.get_emission() + radiance(refl_ray, depth, rand) * RP;
+                    result = radiance(refl_ray, depth, rand) * RP;
                } else {
-                    return mat.get_emission() + radiance(trans_ray, depth, rand) * TP;
+                    result = radiance(trans_ray, depth, rand) * TP;
                }
           } else {
-               return mat.get_emission() + radiance(trans_ray, depth, rand) * Tr;
+               result = radiance(refl_ray, depth, rand) * Re + radiance(trans_ray, depth, rand) * Tr;
           }
+          return mat.get_emission() + f * result;
      }
      }
 }
