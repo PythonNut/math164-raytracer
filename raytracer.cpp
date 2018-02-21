@@ -1,4 +1,5 @@
 #include <iostream>
+#include <fstream>
 #include <math.h>
 #include <vector>
 #include <tuple>
@@ -280,9 +281,48 @@ Color radiance(const Ray& ray, int depth, default_random_engine rand) {
      }
 }
 
-int main ()
+int main (int argc, char *argv[])
 {
-     cout << "Hello World!" << endl;
+     int width = 1024, height = 768;
+     int samples = argc==2 ? atoi(argv[1])/4 : 1;
+
+     random_device rand_dev;
+     default_random_engine rand_engine(rand_dev());
+     uniform_real_distribution<> uniform_rand(0, 1);
+
+     Ray cam(Vector3d(50,52,295.6), Vector3d(0,-0.042612,-1).normalized());
+     Vector3d cx(width*.5135/height,0,0);
+     Vector3d cy=cx.cross(cam.direction).normalized()*.5135;
+     Color r;
+     vector<Color> c(width * height);
+
+     // This is a pretty straightforward port from smallpt
+     // TODO: Make this less horrible.
+     for (int y=0; y<height; y++) {
+          cout << "\rRendering (" << samples*4 << " spp) " << 100.*y/(height-1) << "%" << flush;
+          for (int x=0; x<width; x++) {
+               for (int sy=0, i=(height-y-1)*width+x; sy<2; sy++) {
+                    for (int sx=0; sx<2; sx++){
+                         r = Color(0, 0, 0);
+                         for (int s=0; s<samples; s++) {
+                              double r1=2*uniform_rand(rand_engine), dx=r1<1 ? sqrt(r1)-1: 1-sqrt(2-r1);
+                              double r2=2*uniform_rand(rand_engine), dy=r2<1 ? sqrt(r2)-1: 1-sqrt(2-r2);
+                              Vector3d d = cx*(((sx+.5 + dx)/2 + x)/width - .5) + cy*(((sy+.5 + dy)/2 + y)/height - .5) + cam.direction;
+                              r += radiance(Ray(cam.origin+d*140,d.normalized()),0, rand_engine)*(1./samples);
+                         } // Camera rays are pushed ^^^^^ forward to start in interior
+                         c[i] += Color(clamp(r.x()),clamp(r.y()),clamp(r.z()))*.25;
+                    }
+               }
+          }
+     }
+
+     ofstream out_file;
+     out_file.open("image.ppm");
+     out_file << "P3" << endl << width << " " << height << endl << 255 << endl;
+     for (int i=0; i<width*height; i++) {
+          out_file << toPPM(c[i].x()) << " " << toPPM(c[i].y()) << " " << toPPM(c[i].z()) << " ";
+     }
+     out_file.close();
 }
 // Local Variables:
 // irony-additional-clang-options: ("-std=c++17")
