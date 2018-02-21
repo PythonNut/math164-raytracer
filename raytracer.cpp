@@ -30,7 +30,7 @@ private:
      Reflection reflection;
 
 public:
-     Material(Color col, Color emit, Reflection ref)
+     Material(Color emit, Color col, Reflection ref)
           : color(col)
           , emission(emit)
           , reflection(ref) {}
