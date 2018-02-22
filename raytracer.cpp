@@ -228,12 +228,11 @@ Color radiance(const Ray& ray,
      case Material::Reflection::DIFFUSE: {
           double r1 = uniform_rand(rand) * 2 * M_PI;
           double r2 = uniform_rand(rand), r2s = sqrt(r2);
-          Vector3d w = oriented_normal;
-          Vector3d u = fabs(w.x()) > 0.1 ? Vector3d(0, 1, 0) : Vector3d(1, 0, 0);
+          auto w = oriented_normal;
+          auto u = fabs(w.x()) > 0.1 ? Vector3d(0, 1, 0) : Vector3d(1, 0, 0);
           u = u.cross(w).normalized();
-          Vector3d v = w.cross(u);
-
-          Vector3d d = (u*cos(r1)*r2s + v*sin(r1)*r2s + w*sqrt(1 - r2)).normalized();
+          auto v = w.cross(u);
+          auto d = (u*cos(r1)*r2s + v*sin(r1)*r2s + w*sqrt(1 - r2)).normalized();
 
           Ray r(intersect_point, d);
           return mat.get_emission() + f * radiance(r, depth, rand, uniform_rand);
@@ -257,7 +256,7 @@ Color radiance(const Ray& ray,
           }
 
           // fresnel math makes me sad
-          Vector3d tdir = (ray.direction*nnt - normal*((into?1:-1)*(ddn*nnt+sqrt(cos2t)))).normalized();
+          auto tdir = (ray.direction*nnt - normal*((into?1:-1)*(ddn*nnt+sqrt(cos2t)))).normalized();
           Ray trans_ray(intersect_point, tdir);
           double a=nt-nc, b=nt+nc, R0=(a*a)/(b*b), c=1-(into?-ddn:tdir.dot(normal));
           // TODO: Make this less awful
@@ -305,7 +304,7 @@ int main (int argc, char *argv[])
                          for (int s=0; s<samples; s++) {
                               double r1=2*uniform_rand(rand_engine), dx=r1<1 ? sqrt(r1)-1: 1-sqrt(2-r1);
                               double r2=2*uniform_rand(rand_engine), dy=r2<1 ? sqrt(r2)-1: 1-sqrt(2-r2);
-                              Vector3d d = cx*(((sx+.5 + dx)/2 + x)/width - .5) + cy*(((sy+.5 + dy)/2 + y)/height - .5) + cam.direction;
+                              auto d = cx*(((sx+.5 + dx)/2 + x)/width - .5) + cy*(((sy+.5 + dy)/2 + y)/height - .5) + cam.direction;
                               r += radiance(Ray(cam.origin+d*140,d.normalized()),0, rand_engine, uniform_rand)*(1./samples);
                          } // Camera rays are pushed ^^^^^ forward to start in interior
                          c[i] += Color(clamp(r.x()),clamp(r.y()),clamp(r.z()))*.25;
