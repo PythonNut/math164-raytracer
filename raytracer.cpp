@@ -195,7 +195,10 @@ const optional<pair<double, vector<Sphere>::const_iterator>> intersect(const Ray
      return make_pair(nearest_distance, nearest_sphere);
 }
 
-Color radiance(const Ray& ray, int depth, default_random_engine rand) {
+Color radiance(const Ray& ray,
+               int depth,
+               default_random_engine rand,
+               uniform_real_distribution<> uniform_rand) {
      auto hit_check = intersect(ray, spheres);
      if (!hit_check.has_value() || depth > 10) {
           return Color(0, 0, 0);
@@ -211,9 +214,6 @@ Color radiance(const Ray& ray, int depth, default_random_engine rand) {
 
      Material mat = sphere->get_material();
      Color f = mat.get_color();
-
-     // this might be slow...
-     uniform_real_distribution<> uniform_rand(0, 1);
 
      double p = f.maxCoeff();
      if (++depth>5 || !p) {
@@ -236,13 +236,14 @@ Color radiance(const Ray& ray, int depth, default_random_engine rand) {
           Vector3d d = (u*cos(r1)*r2s + v*sin(r1)*r2s + w*sqrt(1 - r2)).normalized();
 
           Ray r(intersect_point, d);
-          return mat.get_emission() + f * radiance(r, depth, rand);
+          return mat.get_emission() + f * radiance(r, depth, rand, uniform_rand);
      }
 
      case Material::Reflection::SPECULAR: {
           Ray r(intersect_point, ray.direction - normal*2*normal.dot(ray.direction));
-          return mat.get_emission() + f * radiance(r, depth, rand);
+          return mat.get_emission() + f * radiance(r, depth, rand, uniform_rand);
      }
+
      case Material::Reflection::REFRACTIVE: {
           Ray refl_ray(intersect_point, ray.direction - normal*2*normal.dot(ray.direction));
           bool into = normal.dot(oriented_normal) > 0;
@@ -252,7 +253,7 @@ Color radiance(const Ray& ray, int depth, default_random_engine rand) {
           double ddn = ray.direction.dot(oriented_normal);
           double cos2t = 1- nnt * nnt * (1 - ddn * ddn);
           if (cos2t < 0) {
-               return mat.get_emission() + f * radiance(refl_ray, depth, rand);
+               return mat.get_emission() + f * radiance(refl_ray, depth, rand, uniform_rand);
           }
 
           // fresnel math makes me sad
@@ -262,15 +263,16 @@ Color radiance(const Ray& ray, int depth, default_random_engine rand) {
           // TODO: Make this less awful
           double Re=R0+(1-R0)*pow(c, 5), Tr=1-Re, P=.25+.5*Re, RP=Re/P, TP=Tr/(1-P);
 
-          Color result;
+          Color result(0, 0, 0);
           if (depth > 2) {
                if (uniform_rand(rand) < P) {
-                    result = radiance(refl_ray, depth, rand) * RP;
+                    result = radiance(refl_ray, depth, rand, uniform_rand) * RP;
                } else {
-                    result = radiance(trans_ray, depth, rand) * TP;
+                    result = radiance(trans_ray, depth, rand, uniform_rand) * TP;
                }
           } else {
-               result = radiance(refl_ray, depth, rand) * Re + radiance(trans_ray, depth, rand) * Tr;
+               result += radiance(refl_ray, depth, rand, uniform_rand) * Re;
+               result += radiance(trans_ray, depth, rand, uniform_rand) * Tr;
           }
           return mat.get_emission() + f * result;
      }
@@ -304,7 +306,7 @@ int main (int argc, char *argv[])
                               double r1=2*uniform_rand(rand_engine), dx=r1<1 ? sqrt(r1)-1: 1-sqrt(2-r1);
                               double r2=2*uniform_rand(rand_engine), dy=r2<1 ? sqrt(r2)-1: 1-sqrt(2-r2);
                               Vector3d d = cx*(((sx+.5 + dx)/2 + x)/width - .5) + cy*(((sy+.5 + dy)/2 + y)/height - .5) + cam.direction;
-                              r += radiance(Ray(cam.origin+d*140,d.normalized()),0, rand_engine)*(1./samples);
+                              r += radiance(Ray(cam.origin+d*140,d.normalized()),0, rand_engine, uniform_rand)*(1./samples);
                          } // Camera rays are pushed ^^^^^ forward to start in interior
                          c[i] += Color(clamp(r.x()),clamp(r.y()),clamp(r.z()))*.25;
                     }
