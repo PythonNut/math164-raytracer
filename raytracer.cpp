@@ -322,11 +322,13 @@ int main (int argc, char *argv[])
           }
      }
 
+     const IOFormat fmt(2, DontAlignCols, " ", " ", "", "", "", "");
+
      ofstream out_file;
      out_file.open("image.ppm");
      out_file << "P3" << endl << width << " " << height << endl << 255 << endl;
      for (int i=0; i<width*height; i++) {
-          out_file << toPPM(c[i].x()) << " " << toPPM(c[i].y()) << " " << toPPM(c[i].z()) << " ";
+          out_file << c[i].unaryExpr(ptr_fun(toPPM)).format(fmt) << " ";
      }
      out_file.close();
 }
