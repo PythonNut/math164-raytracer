@@ -205,10 +205,6 @@ Color radiance(const Ray& ray, int depth, default_random_engine rand) {
      vector<Sphere>::const_iterator sphere;
      tie(distance, sphere) = hit_check.value();
 
-     if (depth > 10) {
-          return Vector3d(0, 0, 0);
-     }
-
      Vector3d intersect_point = ray.origin + ray.direction * distance;
      Vector3d normal = (intersect_point - sphere->get_origin()).normalized();
      Vector3d oriented_normal = normal.dot(ray.direction) < 0 ? normal : -normal;
