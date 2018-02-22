@@ -63,7 +63,7 @@ public:
           , material(mat) { }
 
      optional<double> intersect(const Ray &ray) const {
-          auto op = this->origin - ray.origin;
+          Vector3d op = this->origin - ray.origin;
           double epsilon = 1e-4;
           double b = op.dot(ray.direction);
           double r2 = this->radius * this->radius;
@@ -213,9 +213,9 @@ const Color radiance(const Ray& ray,
      vector<Sphere>::const_iterator sphere;
      tie(distance, sphere) = hit_check.value();
 
-     auto intersect_point = ray.origin + ray.direction * distance;
-     auto normal = sphere->get_normal(intersect_point);
-     auto oriented_normal = normal.dot(ray.direction) < 0 ? normal : -normal;
+     Vector3d intersect_point = ray.origin + ray.direction * distance;
+     Vector3d normal = sphere->get_normal(intersect_point);
+     Vector3d oriented_normal = normal.dot(ray.direction) < 0 ? normal : -normal;
      auto mat = sphere->get_material();
 
      Color f = mat.get_color();
@@ -233,11 +233,11 @@ const Color radiance(const Ray& ray,
      case Material::Reflection::DIFFUSE: {
           double r1 = uniform_rand(rand) * 2 * M_PI;
           double r2 = uniform_rand(rand), r2s = sqrt(r2);
-          auto w = oriented_normal;
-          auto u = fabs(w.x()) > 0.1 ? Vector3d(0, 1, 0) : Vector3d(1, 0, 0);
+          Vector3d w = oriented_normal;
+          Vector3d u = fabs(w.x()) > 0.1 ? Vector3d(0, 1, 0) : Vector3d(1, 0, 0);
           u = u.cross(w).normalized();
-          auto v = w.cross(u);
-          auto d = (u*cos(r1)*r2s + v*sin(r1)*r2s + w*sqrt(1 - r2)).normalized();
+          Vector3d v = w.cross(u);
+          Vector3d d = (u*cos(r1)*r2s + v*sin(r1)*r2s + w*sqrt(1 - r2)).normalized();
 
           Ray r(intersect_point, d);
           return mat.get_emission() + f * radiance(r, depth, rand, uniform_rand);
@@ -261,7 +261,7 @@ const Color radiance(const Ray& ray,
           }
 
           // fresnel math makes me sad
-          auto tdir = (ray.direction*nnt - normal*((into?1:-1)*(ddn*nnt+sqrt(cos2t)))).normalized();
+          Vector3d tdir = (ray.direction*nnt - normal*((into?1:-1)*(ddn*nnt+sqrt(cos2t)))).normalized();
           Ray trans_ray(intersect_point, tdir);
           double a=nt-nc, b=nt+nc, R0=(a*a)/(b*b), c=1-(into?-ddn:tdir.dot(normal));
           // TODO: Make this less awful
@@ -312,7 +312,7 @@ int main (int argc, char *argv[])
                               double r2=2*uniform_rand(rand_engine);
                               double dy=r2<1 ? sqrt(r2)-1: 1-sqrt(2-r2);
 
-                              auto d = cx*(((sx+.5 + dx)/2 + x)/width - .5) + cy*(((sy+.5 + dy)/2 + y)/height - .5) + cam.direction;
+                              Vector3d d = cx*(((sx+.5 + dx)/2 + x)/width - .5) + cy*(((sy+.5 + dy)/2 + y)/height - .5) + cam.direction;
                               Ray ray(cam.origin + d*140, d.normalized());
                               r += radiance(ray, 0, rand_engine, uniform_rand)/samples;
                          } // Camera rays are pushed ^^^^^ forward to start in interior
