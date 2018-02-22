@@ -170,37 +170,37 @@ const vector<Sphere> spheres = {
                      Material::Reflection::DIFFUSE))
 };
 
-const double clamp_intensity(const double x) {
+double clamp_intensity(const double x) {
      return fmin(fmax(0, x), 1);
 }
 
-const int toPPM(const double x) {
+int toPPM(const double x) {
      return pow(clamp_intensity(x), 1/2.2) * 255 + 0.5;
 }
 
 const optional<pair<double, vector<Sphere>::const_iterator>> intersect(const Ray& ray,
-                                                                       const vector<Sphere>& spheres) {
+                                                                       const vector<Sphere>& scene) {
      double inf = std::numeric_limits<double>::infinity();
      double nearest_distance = inf;
-     auto nearest_sphere = spheres.end();
+     auto nearest_object = scene.end();
 
-     for (auto it=spheres.begin(); it != spheres.end(); it++) {
+     for (auto it=scene.begin(); it != scene.end(); it++) {
           auto hit_check = it->intersect(ray);
           if (!hit_check.has_value()) {
                continue;
           }
           double distance = hit_check.value();
           if (distance < nearest_distance) {
-               nearest_sphere = it;
+               nearest_object = it;
                nearest_distance = distance;
           }
      }
 
-     if (nearest_sphere == spheres.end()) {
+     if (nearest_object == spheres.end()) {
           return {};
      }
 
-     return make_pair(nearest_distance, nearest_sphere);
+     return make_pair(nearest_distance, nearest_object);
 }
 
 const Color radiance(const Ray& ray,
@@ -287,6 +287,7 @@ const Color radiance(const Ray& ray,
           }
           return mat.get_emission() + f * result;
      }
+     default: return mat.get_emission();
      }
 }
 
