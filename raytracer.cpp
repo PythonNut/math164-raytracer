@@ -7,6 +7,8 @@
 #include <random>
 #include <functional>
 #include <eigen3/Eigen/Dense>
+#include <SFML/Window.hpp>
+#include <SFML/Graphics.hpp>
 
 using namespace Eigen;
 using namespace std;
@@ -304,6 +306,9 @@ int main (int argc, char *argv[])
      Vector3d cy=cx.cross(cam.direction).normalized()*.5135;
      vector<Color> c(width * height);
 
+     sf::Image image;
+     image.create(width, height, sf::Color::Black);
+
      // This is a pretty straightforward port from smallpt
      // TODO: Make this less horrible.
      #pragma omp parallel for schedule(dynamic)
@@ -328,16 +333,14 @@ int main (int argc, char *argv[])
                          c[i] += r.unaryExpr(ptr_fun(clamp_intensity))*.25;
                     }
                }
+               sf::Color color(toPPM(c[i].x()), toPPM(c[i].y()), toPPM(c[i].z()));
+               image.setPixel(x, (height-1)-y, color);
           }
      }
 
-     ofstream out_file;
-     out_file.open("image.ppm");
-     out_file << "P3" << endl << width << " " << height << endl << 255 << endl;
-     for (int i=0; i<width*height; i++) {
-          out_file << toPPM(c[i].x()) << " " << toPPM(c[i].y()) << " " << toPPM(c[i].z()) << " ";
+     if (!image.saveToFile("image.png")) {
+          return -1;
      }
-     out_file.close();
 }
 // Local Variables:
 // irony-additional-clang-options: ("-std=c++17")
