@@ -215,7 +215,11 @@ const Color radiance(const Ray& ray,
 
      Vector3d intersect_point = ray.origin + ray.direction * distance;
      Vector3d normal = sphere->get_normal(intersect_point);
-     Vector3d oriented_normal = normal.dot(ray.direction) < 0 ? normal : -normal;
+     Vector3d oriented_normal = normal;
+     if (normal.dot(ray.direction) > 0) {
+          oriented_normal *= -1;
+     }
+
      auto mat = sphere->get_material();
 
      Color f = mat.get_color();
