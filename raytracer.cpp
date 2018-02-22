@@ -302,7 +302,8 @@ int main (int argc, char *argv[])
      for (int y=0; y<height; y++) {
           cout << "\rRendering (" << samples*4 << " spp) " << 100.*y/(height-1) << "%" << flush;
           for (int x=0; x<width; x++) {
-               for (int sy=0, i=(height-y-1)*width+x; sy<2; sy++) {
+               int i=(height-y-1)*width+x;
+               for (int sy=0; sy<2; sy++) {
                     for (int sx=0; sx<2; sx++){
                          r = Color(0, 0, 0);
                          for (int s=0; s<samples; s++) {
