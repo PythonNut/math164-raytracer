@@ -295,7 +295,6 @@ int main (int argc, char *argv[])
      Ray cam(Vector3d(50,52,295.6), Vector3d(0,-0.042612,-1).normalized());
      Vector3d cx(width*.5135/height,0,0);
      Vector3d cy=cx.cross(cam.direction).normalized()*.5135;
-     Color r;
      vector<Color> c(width * height);
 
      // This is a pretty straightforward port from smallpt
@@ -306,12 +305,16 @@ int main (int argc, char *argv[])
                int i=(height-y-1)*width+x;
                for (int sy=0; sy<2; sy++) {
                     for (int sx=0; sx<2; sx++){
-                         r = Color(0, 0, 0);
+                         Color r(0, 0, 0);
                          for (int s=0; s<samples; s++) {
-                              double r1=2*uniform_rand(rand_engine), dx=r1<1 ? sqrt(r1)-1: 1-sqrt(2-r1);
-                              double r2=2*uniform_rand(rand_engine), dy=r2<1 ? sqrt(r2)-1: 1-sqrt(2-r2);
+                              double r1=2*uniform_rand(rand_engine);
+                              double dx=r1<1 ? sqrt(r1)-1: 1-sqrt(2-r1);
+                              double r2=2*uniform_rand(rand_engine);
+                              double dy=r2<1 ? sqrt(r2)-1: 1-sqrt(2-r2);
+
                               auto d = cx*(((sx+.5 + dx)/2 + x)/width - .5) + cy*(((sy+.5 + dy)/2 + y)/height - .5) + cam.direction;
-                              r += radiance(Ray(cam.origin+d*140,d.normalized()),0, rand_engine, uniform_rand)*(1./samples);
+                              Ray ray(cam.origin + d*140, d.normalized());
+                              r += radiance(ray, 0, rand_engine, uniform_rand)/samples;
                          } // Camera rays are pushed ^^^^^ forward to start in interior
                          c[i] += r.unaryExpr(ptr_fun(clamp_intensity))*.25;
                     }
