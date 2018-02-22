@@ -1,4 +1,5 @@
 #include <iostream>
+#include <iomanip>
 #include <fstream>
 #include <math.h>
 #include <vector>
@@ -289,6 +290,8 @@ const Color radiance(const Ray& ray,
 
 int main (int argc, char *argv[])
 {
+     cout << fixed << setw(2) << setprecision(2) ;
+
      int width = 1024, height = 768;
      int samples = argc==2 ? atoi(argv[1])/4 : 1;
 
@@ -303,7 +306,9 @@ int main (int argc, char *argv[])
 
      // This is a pretty straightforward port from smallpt
      // TODO: Make this less horrible.
+     #pragma omp parallel for schedule(dynamic)
      for (int y=0; y<height; y++) {
+          #pragma omp critical
           cout << "\rRendering (" << samples*4 << " spp) " << 100.*y/(height-1) << "%" << flush;
           for (int x=0; x<width; x++) {
                int i=(height-y-1)*width+x;
