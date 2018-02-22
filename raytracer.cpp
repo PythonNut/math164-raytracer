@@ -84,6 +84,10 @@ public:
           return {};
      }
 
+     Vector3d get_normal(Vector3d point) const {
+          return (point - this->get_origin()).normalized();
+     }
+
      double get_radius() const {
           return this->radius;
      }
@@ -209,7 +213,7 @@ Color radiance(const Ray& ray,
      tie(distance, sphere) = hit_check.value();
 
      Vector3d intersect_point = ray.origin + ray.direction * distance;
-     Vector3d normal = (intersect_point - sphere->get_origin()).normalized();
+     Vector3d normal = sphere->get_normal(intersect_point);
      Vector3d oriented_normal = normal.dot(ray.direction) < 0 ? normal : -normal;
 
      Material mat = sphere->get_material();
