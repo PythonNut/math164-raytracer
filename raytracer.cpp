@@ -166,11 +166,11 @@ const vector<Sphere> spheres = {
                      Material::Reflection::DIFFUSE))
 };
 
-double clamp(double x) {
+const double clamp(const double x) {
      return fmin(fmax(0, x), 1);
 }
 
-int toPPM(double x) {
+const int toPPM(const double x) {
      return pow(clamp(x), 1/2.2) * 255 + 0.5;
 }
 
@@ -199,10 +199,10 @@ const optional<pair<double, vector<Sphere>::const_iterator>> intersect(const Ray
      return make_pair(nearest_distance, nearest_sphere);
 }
 
-Color radiance(const Ray& ray,
-               int depth,
-               default_random_engine rand,
-               uniform_real_distribution<> uniform_rand) {
+const Color radiance(const Ray& ray,
+                     int depth,
+                     default_random_engine rand,
+                     uniform_real_distribution<> uniform_rand) {
      auto hit_check = intersect(ray, spheres);
      if (!hit_check.has_value() || depth > 10) {
           return Color(0, 0, 0);
@@ -212,11 +212,11 @@ Color radiance(const Ray& ray,
      vector<Sphere>::const_iterator sphere;
      tie(distance, sphere) = hit_check.value();
 
-     Vector3d intersect_point = ray.origin + ray.direction * distance;
-     Vector3d normal = sphere->get_normal(intersect_point);
-     Vector3d oriented_normal = normal.dot(ray.direction) < 0 ? normal : -normal;
+     auto intersect_point = ray.origin + ray.direction * distance;
+     auto normal = sphere->get_normal(intersect_point);
+     auto oriented_normal = normal.dot(ray.direction) < 0 ? normal : -normal;
+     auto mat = sphere->get_material();
 
-     Material mat = sphere->get_material();
      Color f = mat.get_color();
 
      double p = f.maxCoeff();
