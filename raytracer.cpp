@@ -4,6 +4,7 @@
 #include <vector>
 #include <tuple>
 #include <random>
+#include <functional>
 #include <eigen3/Eigen/Dense>
 
 using namespace Eigen;
@@ -166,12 +167,12 @@ const vector<Sphere> spheres = {
                      Material::Reflection::DIFFUSE))
 };
 
-const double clamp(const double x) {
+const double clamp_intensity(const double x) {
      return fmin(fmax(0, x), 1);
 }
 
 const int toPPM(const double x) {
-     return pow(clamp(x), 1/2.2) * 255 + 0.5;
+     return pow(clamp_intensity(x), 1/2.2) * 255 + 0.5;
 }
 
 const optional<pair<double, vector<Sphere>::const_iterator>> intersect(const Ray& ray,
@@ -312,7 +313,7 @@ int main (int argc, char *argv[])
                               auto d = cx*(((sx+.5 + dx)/2 + x)/width - .5) + cy*(((sy+.5 + dy)/2 + y)/height - .5) + cam.direction;
                               r += radiance(Ray(cam.origin+d*140,d.normalized()),0, rand_engine, uniform_rand)*(1./samples);
                          } // Camera rays are pushed ^^^^^ forward to start in interior
-                         c[i] += Color(clamp(r.x()),clamp(r.y()),clamp(r.z()))*.25;
+                         c[i] += r.unaryExpr(ptr_fun(clamp_intensity))*.25;
                     }
                }
           }
