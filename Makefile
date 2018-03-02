@@ -8,7 +8,7 @@ endif
 
 LIBS = -lsfml-window -lsfml-graphics -lsfml-system
 
-CXXFLAGS = -std=c++17 -O3 -Wall -flto -fopenmp
+CXXFLAGS = -std=c++17 -O3 -Wall -flto -fopenmp -march=native -mtune=native
 
 .PHONY: default all clean
 
@@ -19,7 +19,7 @@ clean:
 	-rm -f raytracer
 
 raytracer: raytracer.cpp
-	$(CXX) $(CXXFLAGS) $(OBJECTS) raytracer.cpp $(LIBS) -o $@
+	$(CXX) $(CXXFLAGS) raytracer.cpp $(LIBS) -o $@
 
 grind: raytracer
 	valgrind --leak-check=yes --read-var-info=yes --track-origins=yes ./raytracer
