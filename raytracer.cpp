@@ -6,6 +6,7 @@
 #include <tuple>
 #include <random>
 #include <functional>
+#include <algorithm>
 #include <eigen3/Eigen/Dense>
 #include <SFML/Window.hpp>
 #include <SFML/Graphics.hpp>
@@ -74,7 +75,7 @@ public:
     double z() const {return this->c;}
 
     double maxCoeff() const{
-        return fmax(this->a, fmax(this->b, this->c));
+        return max(this->a, max(this->b, this->c));
     }
 };
 
@@ -365,7 +366,7 @@ Object scene_temp[] = {
 const vector<Object> scene{make_move_iterator(begin(scene_temp)), make_move_iterator(end(scene_temp))};
 
 double clamp_intensity(const double x) {
-    return fmin(fmax(0, x), 1);
+    return min(max(0.0, x), 1.0);
 }
 
 Color clamp_intensity(Color c) {
