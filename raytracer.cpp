@@ -333,7 +333,7 @@ int main (int argc, char *argv[])
                         Ray ray(cam.origin + d*140, d.normalized());
                         r += radiance(ray, 0, rand_engine, uniform_rand)/samples;
                     } // Camera rays are pushed ^^^^^ forward to start in interior
-                    c[i] += r.unaryExpr(ptr_fun(clamp_intensity))*.25;
+                    c[i] += r*.25;
                 }
             }
             sf::Color color(toPPM(c[i].x()), toPPM(c[i].y()), toPPM(c[i].z()));
