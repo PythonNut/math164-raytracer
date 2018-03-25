@@ -272,18 +272,22 @@ const Color radiance(const Ray& ray,
         Ray trans_ray(intersect_point, tdir);
         double a=nt-nc, b=nt+nc, R0=(a*a)/(b*b), c=1-(into?-ddn:tdir.dot(normal));
         // TODO: Make this less awful
-        double Re=R0+(1-R0)*pow(c, 5), Tr=1-Re, P=.25+.5*Re, RP=Re/P, TP=Tr/(1-P);
 
-        Color result(0, 0, 0);
+        double Re=R0+(1-R0)*pow(c, 5);
+        Color result;
         if (depth > 2) {
+            double Tr=1-Re, P=.25+.5*Re, RP=Re/P, TP=Tr/(1-P);
             if (uniform_rand(rand) < P) {
                 result = radiance(refl_ray, depth, rand, uniform_rand) * RP;
             } else {
                 result = radiance(trans_ray, depth, rand, uniform_rand) * TP;
             }
         } else {
-            result += radiance(refl_ray, depth, rand, uniform_rand) * Re;
-            result += radiance(trans_ray, depth, rand, uniform_rand) * Tr;
+            if (uniform_rand(rand) < Re) {
+                result = radiance(refl_ray, depth, rand, uniform_rand);
+            } else {
+                result = radiance(trans_ray, depth, rand, uniform_rand);
+            }
         }
         return mat.get_emission() + f * result;
     }
