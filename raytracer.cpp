@@ -180,19 +180,17 @@ int toPPM(const double x) {
 
 const optional<pair<double, vector<Sphere>::const_iterator>> intersect(const Ray& ray,
                                                                        const vector<Sphere>& scene) {
-    double inf = std::numeric_limits<double>::infinity();
-    double nearest_distance = inf;
+    double nearest_distance = std::numeric_limits<double>::infinity();
     auto nearest_object = scene.end();
 
-    for (auto it=scene.begin(); it != scene.end(); it++) {
+    for (auto it=scene.begin(); it != scene.end(); ++it) {
         auto hit_check = it->intersect(ray);
-        if (!hit_check.has_value()) {
-            continue;
-        }
-        double distance = hit_check.value();
-        if (distance < nearest_distance) {
-            nearest_object = it;
-            nearest_distance = distance;
+        if (hit_check.has_value()) {
+            double distance = hit_check.value();
+            if (distance < nearest_distance) {
+                nearest_object = it;
+                nearest_distance = distance;
+            }
         }
     }
 
