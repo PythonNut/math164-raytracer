@@ -330,7 +330,8 @@ int main (int argc, char *argv[])
                         double dy=r2<1 ? sqrt(r2)-1: 1-sqrt(2-r2);
 
                         Vector3d d = cx*(((sx+.5 + dx)/2 + x)/width - .5) + cy*(((sy+.5 + dy)/2 + y)/height - .5) + cam.direction;
-                        Ray ray(cam.origin + d*140, d.normalized());
+                        d = d.normalized();
+                        Ray ray(cam.origin + d*140, d);
                         r += radiance(ray, 0, rand_engine, uniform_rand)/samples;
                     } // Camera rays are pushed ^^^^^ forward to start in interior
                     c[i] += r*.25;
