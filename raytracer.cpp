@@ -1,7 +1,7 @@
 #include <iostream>
 #include <iomanip>
 #include <fstream>
-#include <math.h>
+#include <cmath>
 #include <vector>
 #include <tuple>
 #include <random>
