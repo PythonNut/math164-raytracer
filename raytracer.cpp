@@ -11,6 +11,9 @@
 #include <SFML/Window.hpp>
 #include <SFML/Graphics.hpp>
 
+/* Comment this line out to get a small speed boost, at the cost of
+ * some features */
+#define USE_EIGEN
 using namespace std;
 
 class Vec {
@@ -66,7 +69,7 @@ public:
         return a*o.a + b*o.b + c*o.c;
     }
 
-    Vec cross(const Vec& o){
+    Vec cross(const Vec& o) const{
         return Vec(b*o.c - c*o.b, c*o.a - a*o.c, a*o.b - b*o.a);
     }
 
@@ -108,135 +111,123 @@ struct Ray {
         , direction(dir) { }
 };
 
-class Material {
-public:
-    /* bounce takes the normal and an incoming ray, and determines
-     * where the next ray is sent. This is done stochatically, using
-     * rand.
-     */
-    virtual optional<Vector3d> bounce(const Vector3d& normal,
-                                      const Vector3d& incoming,
-                                      Random& rand) const = 0;
+class BSDF {
+protected:
+    /* to_world, convert a vector from the normal coordinate system to
+     * the global coordinate system. */
+    Vector3d to_world(double x,
+                      double y,
+                      double z,
+                      const Vector3d& normal) const {
+        Vector3d majorAxis;
 
-    /* colorize takes the light returned by a ray, and computes the
-     * effect this material has on it.
-     */
-    virtual Color colorize(const Color& color) const = 0;
-};
-
-class Diffuse: public Material {
-private:
-    Color color;
-public:
-    Diffuse(Color c) : color(c) { }
-
-    virtual optional<Vector3d> bounce(const Vector3d& normal,
-                                      const Vector3d& incoming,
-                                      Random& rand) const override {
-        Vector3d oriented_normal = normal;
-        if (normal.dot(incoming) > 0) {
-            oriented_normal *= -1;
-        }
-
-        double r1 = rand.unit_rand() * 2 * M_PI;
-        double r2 = rand.unit_rand(), r2s = sqrt(r2);
-        Vector3d w = oriented_normal;
-        Vector3d u = fabs(w.x()) > 0.1 ? Vector3d(0, 1, 0) : Vector3d(1, 0, 0);
-        u = u.cross(w).normalized();
-        Vector3d v = w.cross(u);
-        Vector3d d = (u*cos(r1)*r2s + v*sin(r1)*r2s + w*sqrt(1 - r2)).normalized();
-
-        return d;
-    }
-
-    virtual Color colorize(const Color& c) const override {
-        return this->color * c;
-    };
-};
-
-class Mirror: public Material {
-private:
-    Color color;
-public:
-    Mirror(Color c) : color(c) { }
-
-    virtual optional<Vector3d> bounce(const Vector3d& normal,
-                                      const Vector3d& incoming,
-                                      Random& rand) const override {
-        return incoming - normal*2*normal.dot(incoming);
-    }
-
-    virtual Color colorize(const Color& c) const override {
-        return this->color * c;
-    };
-};
-
-class Glass: public Material {
-private:
-    Color color;
-public:
-    Glass(Color c) : color(c) { }
-
-    virtual optional<Vector3d> bounce(const Vector3d& normal,
-                                      const Vector3d& incoming,
-                                      Random& rand) const override {
-        Vector3d oriented_normal = normal;
-        if (normal.dot(incoming) > 0) {
-            oriented_normal *= -1;
-        }
-
-        Vector3d refl_dir = incoming - normal*2*normal.dot(incoming);
-        bool into = normal.dot(oriented_normal) > 0;
-
-        // compute the IOR ratio
-        double nc=1, nt=1.5, nnt=into ? nc/nt : nt/nc;
-        double ddn = incoming.dot(oriented_normal);
-        double cos2t = 1- nnt * nnt * (1 - ddn * ddn);
-        if (cos2t < 0) {
-            return refl_dir;
-        }
-
-        Vector3d tdir = (incoming*nnt - normal*((into?1:-1)*(ddn*nnt+sqrt(cos2t)))).normalized();
-        double a=nt-nc, b=nt+nc, R0=(a*a)/(b*b), c=1-(into?-ddn:tdir.dot(normal));
-
-        double Re=R0+(1-R0)*pow(c, 5);
-
-        // Currently, I can't get the fresnel to work in this architecture
-        // if (depth > 2) {
-        //     double Tr=1-Re, P=.25+.5*Re, RP=Re/P, TP=Tr/(1-P);
-        //     if (uniform_rand(rand) < P) {
-        //         result = radiance(refl_ray, depth, rand, uniform_rand) * RP;
-        //     } else {
-        //         result = radiance(trans_ray, depth, rand, uniform_rand) * TP;
-        //     }
-        // } else {
-
-        // This is just plain (non-fresnel) behavior
-        if (rand.unit_rand() < Re) {
-            return refl_dir;
+        const double inv_sqrt3 = 1/sqrt(3);
+        if (abs(normal.x()) < inv_sqrt3) {
+            majorAxis = Vector3d(1, 0, 0);
+        } else if (abs(normal.y()) < inv_sqrt3) {
+            majorAxis = Vector3d(0, 1, 0);
         } else {
-            return tdir;
+            majorAxis = Vector3d(0, 0, 1);
         }
+
+        const Vector3d u = normal.cross(majorAxis).normalized();
+        const Vector3d v = normal.cross(u);
+        const Vector3d w = normal;
+
+        return u * x + v * y + w * z;
     }
 
-    virtual Color colorize(const Color& c) const override {
-        return this->color * c;
+public:
+    /* Sampling probability density function. */
+    virtual double pdf(const Vector3d& wi,
+                       const Vector3d& wo,
+                       const Vector3d& normal) const = 0;
+
+    /* Generate a reflected ray with the distribution dictated by the
+     * pdf() */
+    virtual Vector3d sample(const Vector3d& wo,
+                            const Vector3d& normal,
+                            Random& rand) const = 0;
+
+    /* Calculate the BSDF, as a function of the incidence angles. */
+    virtual Color eval(const Vector3d& wi,
+                       const Vector3d& wo,
+                       const Vector3d& normal) const = 0;
+
+    /* Calculate the emission as a function of the incidence
+     * angles. */
+    virtual Color emission(const Vector3d& wi,
+                           const Vector3d& wo,
+                           const Vector3d& normal) const = 0;
+};
+
+class LambertBSDF : public BSDF {
+protected:
+    Color color;
+public:
+    LambertBSDF(Color c) : color(c) {}
+
+    virtual double pdf(const Vector3d& wi,
+                       const Vector3d& wo,
+                       const Vector3d& normal) const override {
+        return M_1_PI/2;
+    };
+
+    virtual Vector3d sample(const Vector3d& wo,
+                            const Vector3d& normal,
+                            Random& rand) const override {
+        double theta = 2 * M_PI * rand.unit_rand();
+        double phi = acos(1 - 2 * rand.unit_rand());
+        double x = sin(phi) * cos(theta);
+        double y = sin(phi) * sin(theta);
+        double z = abs(cos(phi));
+
+        return this->to_world(x, y, z, normal).normalized();
+    };
+
+    virtual Color eval(const Vector3d& wi,
+                       const Vector3d& wo,
+                       const Vector3d& normal) const override {
+        return this->color * M_1_PI * normal.dot(wi);
+    };
+
+    virtual Color emission(const Vector3d& wi,
+                           const Vector3d& wo,
+                           const Vector3d& normal) const override {
+        return Color(0,0,0);
     };
 };
 
-class Emit: public Material {
-private:
-    Color color;
+class LambertBSDF_IS : public LambertBSDF {
 public:
-    Emit(Color c) : color(c) { }
+    LambertBSDF_IS(Color c) : LambertBSDF(c) {}
 
-    virtual optional<Vector3d> bounce(const Vector3d& normal,
-                                      const Vector3d& incoming,
-                                      Random& rand) const override {
-        return {};
-    }
+    virtual double pdf(const Vector3d& in,
+                       const Vector3d& out,
+                       const Vector3d& normal) const override {
+        return normal.dot(in) * M_1_PI;
+    };
 
-    virtual Color colorize(const Color& c) const override {
+    virtual Vector3d sample(const Vector3d& wo,
+                            const Vector3d& normal,
+                            Random& rand) const override {
+        double r = sqrt(rand.unit_rand());
+        double theta = 2 * M_PI * rand.unit_rand();
+        double x = r * cos(theta);
+        double y = r * sin(theta);
+        double z = sqrtf(1.0 - r * r);
+
+        return this->to_world(x, y, z, normal).normalized();
+    };
+};
+
+class EmissionBSDF : public LambertBSDF_IS {
+public:
+    EmissionBSDF(Color c) : LambertBSDF_IS(c) {}
+
+    virtual Color emission(const Vector3d& wi,
+                           const Vector3d& wo,
+                           const Vector3d& normal) const override {
         return this->color;
     };
 };
@@ -294,36 +285,16 @@ public:
     }
 };
 
-class Object {
-private:
+struct Object {
     unique_ptr<Geometry> shape;
-    unique_ptr<Material> mat;
+    unique_ptr<BSDF> mat;
 
-public:
-    Object(unique_ptr<Geometry>(s), unique_ptr<Material>(m))
+    Object(unique_ptr<Geometry>(s), unique_ptr<BSDF>(m))
         : shape(move(s))
         , mat(move(m)) { }
-
-    optional<double> intersect(const Ray &ray) const {
-        return this->shape->intersect(ray);
-    }
-
-    optional<Ray> bounce (const Ray& r,
-                          const Vector3d& intersect_point,
-                          Random& rand) const {
-        Vector3d normal = this->shape->get_normal(intersect_point);
-        auto bounce_check = this->mat->bounce(normal, r.direction, rand);
-        if (bounce_check.has_value()) {
-            return Ray(intersect_point, bounce_check.value());
-        } else {
-            return {};
-        }
-    }
-
-    Color colorize(const Color& c) const {
-        return this->mat->colorize(c);
-    }
 };
+
+typedef LambertBSDF_IS Diffuse;
 
 Object scene_temp[] = {
     // left
@@ -340,7 +311,7 @@ Object scene_temp[] = {
 
     // front
     Object(move(make_unique<Sphere>(Sphere(1e5, Vector3d(50, 40.8, -1e5+170)))),
-           move(make_unique<Diffuse>(Diffuse(Color(0,0,0))))),
+           move(make_unique<Diffuse>(Diffuse(Color(0, 0, 0))))),
 
     // bottom
     Object(move(make_unique<Sphere>(Sphere(1e5, Vector3d(50, 1e5, 81.6)))),
@@ -352,36 +323,19 @@ Object scene_temp[] = {
 
     // mirror
     Object(move(make_unique<Sphere>(Sphere(16.5, Vector3d(27, 16.5, 47)))),
-           move(make_unique<Mirror>(Mirror(Color(1,1,1)*.999)))),
+           move(make_unique<Diffuse>(Diffuse(Color(1, 1, 1)*.999)))),
 
     // glass
     Object(move(make_unique<Sphere>(Sphere(16.5, Vector3d(73, 16.5, 78)))),
-           move(make_unique<Glass>(Glass(Color(1,1,1)*.999)))),
+           move(make_unique<Diffuse>(Diffuse(Color(1, 1, 1)*.999)))),
 
     // light
     Object(move(make_unique<Sphere>(Sphere(600, Vector3d(50, 681.6-.27, 81.6)))),
-           move(make_unique<Emit>(Emit(Color(12,12,12)))))
+           move(make_unique<EmissionBSDF>(EmissionBSDF(Color(12, 12, 12)))))
 };
 
 const vector<Object> scene{make_move_iterator(begin(scene_temp)), make_move_iterator(end(scene_temp))};
 
-double clamp_intensity(const double x) {
-    return min(max(0.0, x), 1.0);
-}
-
-Color clamp_intensity(Color c) {
-    return Color(clamp_intensity(c.x()),
-                 clamp_intensity(c.y()),
-                 clamp_intensity(c.z()));
-}
-
-int toPPM(const double x) {
-    return pow(clamp_intensity(x), 1/2.2) * 255 + 0.5;
-}
-
-sf::Color toPPM(Color c) {
-    return sf::Color(toPPM(c.x()), toPPM(c.y()), toPPM(c.z()));
-}
 
 const optional<pair<double, vector<Object>::const_iterator>> intersect(const Ray& ray,
                                                                        const vector<Object>& scene) {
@@ -389,7 +343,7 @@ const optional<pair<double, vector<Object>::const_iterator>> intersect(const Ray
     auto nearest_object = scene.end();
 
     for (auto it=scene.begin(); it != scene.end(); ++it) {
-        auto hit_check = it->intersect(ray);
+        auto hit_check = it->shape->intersect(ray);
         if (hit_check.has_value()) {
             double distance = hit_check.value();
             if (distance < nearest_distance) {
@@ -421,23 +375,42 @@ const Color radiance(const vector<Object>& scene,
 
     Vector3d intersect_point = ray.origin + ray.direction * distance;
 
-    // Idk what this is for!
-    // double p = f.maxCoeff();
-    // if (++depth>5 || !p) {
-    //     if (uniform_rand(rand) < p) {
-    //         f /= p;
-    //     } else {
-    //         return mat.get_emission();
-    //     }
-    // }
-
-    auto bounce_check = obj->bounce(ray, intersect_point, rand);
-    if (bounce_check.has_value()) {
-        Color r = radiance(scene, bounce_check.value(), depth+1, rand);
-        return obj->colorize(r);
-    } else {
-        return obj->colorize(Color(0,0,0));
+    Vector3d wo = -ray.direction.normalized();
+    Vector3d normal = obj->shape->get_normal(intersect_point);
+    Vector3d oriented_normal = normal;
+    if (normal.dot(wo) < 0) {
+        oriented_normal *= -1;
     }
+
+    Vector3d wi = obj->mat->sample(wo, oriented_normal, rand);
+    Color r = radiance(scene, Ray(intersect_point, wi), depth+1, rand);
+    double pdf = obj->mat->pdf(wi, wo, oriented_normal);
+
+    Color emit = obj->mat->emission(wi, wo, oriented_normal);
+
+    if (emit.maxCoeff()) {
+        return emit;
+    }
+
+    return obj->mat->eval(wi, wo, oriented_normal) * r/pdf;
+}
+
+double clamp_intensity(const double x) {
+    return min(max(0.0, x), 1.0);
+}
+
+Color clamp_intensity(Color c) {
+    return Color(clamp_intensity(c.x()),
+                 clamp_intensity(c.y()),
+                 clamp_intensity(c.z()));
+}
+
+int toPPM(const double x) {
+    return pow(clamp_intensity(x), 1/2.2) * 255 + 0.5;
+}
+
+sf::Color toPPM(Color c) {
+    return sf::Color(toPPM(c.x()), toPPM(c.y()), toPPM(c.z()));
 }
 
 int main (int argc, char *argv[])
