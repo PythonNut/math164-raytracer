@@ -90,6 +90,16 @@ typedef Vec Vector3d;
 typedef Vec Color;
 #endif
 
+double clamp_intensity(const double x) {
+    return min(max(0.0, x), 1.0);
+}
+
+Color clamp_intensity(Color c) {
+    return Color(clamp_intensity(c.x()),
+                 clamp_intensity(c.y()),
+                 clamp_intensity(c.z()));
+}
+
 class Random {
     default_random_engine rand_engine;
     uniform_real_distribution<> uniform_rand;
@@ -161,12 +171,7 @@ public:
                            const Vector3d& normal) const = 0;
 };
 
-class LambertBSDF : public BSDF {
-protected:
-    Color color;
-public:
-    LambertBSDF(Color c) : color(c) {}
-
+class UniformSamplingBSDF : public BSDF {
     virtual double pdf(const Vector3d& wi,
                        const Vector3d& wo,
                        const Vector3d& normal) const override {
@@ -184,6 +189,13 @@ public:
 
         return this->to_world(x, y, z, normal).normalized();
     };
+};
+
+class LambertBSDF : public UniformSamplingBSDF {
+protected:
+    Color color;
+public:
+    LambertBSDF(Color c) : color(c) {}
 
     virtual Color eval(const Vector3d& wi,
                        const Vector3d& wo,
@@ -202,10 +214,10 @@ class LambertBSDF_IS : public LambertBSDF {
 public:
     LambertBSDF_IS(Color c) : LambertBSDF(c) {}
 
-    virtual double pdf(const Vector3d& in,
-                       const Vector3d& out,
+    virtual double pdf(const Vector3d& wi,
+                       const Vector3d& wo,
                        const Vector3d& normal) const override {
-        return normal.dot(in) * M_1_PI;
+        return normal.dot(wi) * M_1_PI;
     };
 
     virtual Vector3d sample(const Vector3d& wo,
@@ -218,6 +230,130 @@ public:
         double z = sqrtf(1.0 - r * r);
 
         return this->to_world(x, y, z, normal).normalized();
+    };
+};
+
+class ConductorBSDF : public UniformSamplingBSDF {
+protected:
+    Color fresnel(double cos_theta_i,
+                  Color eta,
+                  Color kappa) const {
+        Color eta2kappa2 = eta * eta + kappa * kappa;
+        Color pm = 2 * eta * cos_theta_i;
+        double cos_theta_i2 = cos_theta_i * cos_theta_i;
+
+        Color r_para2_base = eta2kappa2 * cos_theta_i2 + 1;
+        Color r_para2 = (r_para2_base - pm)/(r_para2_base + pm);
+
+        Color r_perp2_base = eta2kappa2 + cos_theta_i2;
+        Color r_perp2 = (r_perp2_base - pm)/(r_perp2_base + pm);
+
+        return (clamp_intensity(r_para2) + clamp_intensity(r_perp2))/2;
+    };
+};
+
+class GGXConductorBSDF : public ConductorBSDF {
+protected:
+    Color color, eta, kappa;
+    double alpha;
+
+    double microfacet_distribution(const Vector3d& m,
+                                   const Vector3d& n) const {
+        double n_dot_m = n.dot(m);
+        double sin_theta_m = sqrt(1 - n_dot_m * n_dot_m);
+        double tan_theta_m = sin_theta_m / n_dot_m;
+        // if (n_dot_m < 0) {
+        //     return 0;
+        // }
+
+        double alpha2 = this->alpha * this->alpha;
+
+        double denom = n_dot_m * n_dot_m * (alpha2 + tan_theta_m * tan_theta_m);
+
+        return alpha2/(M_PI * denom * denom);
+    }
+
+    double shadow_masking(const Vector3d& v,
+                          const Vector3d& m,
+                          const Vector3d& n) const {
+        double alpha2 = this->alpha * this->alpha;
+        double n_dot_v=n.dot(v);
+        if (v.dot(m)/n_dot_v < 0) {
+            return 0;
+        }
+
+        double tan_theta_v = tan(acos(n_dot_v));
+
+        return 2/(1 + sqrt(1 + alpha2 * tan_theta_v * tan_theta_v));
+    }
+
+public:
+    GGXConductorBSDF(Color c, Color n, Color k, double a) :
+        color(c), eta(n), kappa(k), alpha(a) { }
+
+    virtual Color eval(const Vector3d& wi,
+                       const Vector3d& wo,
+                       const Vector3d& normal) const override {
+        Vector3d h = (wi + wo).normalized();
+        // Paper implies this condition, but the results were bad.
+        // if (wi.dot(wo) < 0) {
+        //     h *= -1;
+        // }
+
+        Color F = this->fresnel(h.dot(wi), this->eta, this->kappa);
+        double D = this->microfacet_distribution(h, normal);
+        double G = this->shadow_masking(wi, h, normal) * this->shadow_masking(wo, h, normal);
+
+        return this->color * F * D * G/ (4 * abs(normal.dot(wi)) * abs(normal.dot(wo)));
+    };
+
+    virtual Color emission(const Vector3d& wi,
+                           const Vector3d& wo,
+                           const Vector3d& normal) const override {
+        return Color(0,0,0);
+    };
+};
+
+class GGXConductorBSDF_IS : public GGXConductorBSDF {
+public:
+    GGXConductorBSDF_IS(Color c, Color n, Color k, double a) : GGXConductorBSDF(c, n, k, a) {  }
+
+    virtual double pdf(const Vector3d& wi,
+                       const Vector3d& wo,
+                       const Vector3d& normal) const override {
+
+        Vector3d h = (wi + wo).normalized();
+
+        // double theta = acos(normal.dot(h));
+        // double cos_theta = cos(theta);
+        // double cos_theta2 = cos_theta * cos_theta;
+        // double sin_theta = sin(theta);
+        // double alpha2 = this->alpha * this->alpha;
+        // double denom = (alpha2 - 1) * cos_theta2 + 1;
+
+        // double pdf_h = alpha2 * cos_theta * sin_theta/(M_PI * denom * denom);
+        // return pdf_h * abs(normal.dot(h))/ (4 * wi.dot(h));
+
+        double p_m = microfacet_distribution(h, normal) * abs(normal.dot(h));
+        return p_m/(4 * wo.dot(h));
+    };
+
+    virtual Vector3d sample(const Vector3d& wo,
+                            const Vector3d& normal,
+                            Random& rand) const override {
+        double xi1 = rand.unit_rand();
+        double xi2 = rand.unit_rand();
+
+        double phi = 2 * M_PI * xi1;
+        double theta = atan(this->alpha * sqrt(xi2/(1 - xi2)));
+
+        double x = sin(theta) * cos(phi);
+        double y = sin(theta) * sin(phi);
+        double z = cos(theta);
+
+        Vector3d m = this->to_world(x, y, z, normal).normalized();
+
+        return 2 * wo.dot(m) * m - wo;
     };
 };
 
@@ -295,6 +431,7 @@ struct Object {
 };
 
 typedef LambertBSDF_IS Diffuse;
+typedef GGXConductorBSDF Glossy;
 
 Object scene_temp[] = {
     // left
@@ -327,7 +464,10 @@ Object scene_temp[] = {
 
     // glass
     Object(move(make_unique<Sphere>(Sphere(16.5, Vector3d(73, 16.5, 78)))),
-           move(make_unique<Diffuse>(Diffuse(Color(1, 1, 1)*.999)))),
+           move(make_unique<Glossy>(Glossy(Color(1, 1, 1)*.999,
+                                           Color(0.155, 0.424, 1.383),
+                                           Color(3.602, 2.472, 1.916),
+                                           0.001)))),
 
     // light
     Object(move(make_unique<Sphere>(Sphere(600, Vector3d(50, 681.6-.27, 81.6)))),
@@ -393,16 +533,6 @@ const Color radiance(const vector<Object>& scene,
     }
 
     return obj->mat->eval(wi, wo, oriented_normal) * r/pdf;
-}
-
-double clamp_intensity(const double x) {
-    return min(max(0.0, x), 1.0);
-}
-
-Color clamp_intensity(Color c) {
-    return Color(clamp_intensity(c.x()),
-                 clamp_intensity(c.y()),
-                 clamp_intensity(c.z()));
 }
 
 int toPPM(const double x) {
