@@ -31,6 +31,10 @@ public:
         return Vec(a - o.a, b - o.b, c - o.c);
     }
 
+    Vec operator-() const {
+        return Vec(-a, -b, -c);
+    }
+
     Vec operator*(double o) const {
         return Vec(a*o, b*o, c*o);
     }
@@ -81,6 +85,10 @@ public:
         return max(this->a, max(this->b, this->c));
     }
 };
+
+Vec operator* (double k, const Vec& v) {
+    return v * k;
+}
 
 #ifdef USE_EIGEN
 typedef Eigen::Vector3d Vector3d;
