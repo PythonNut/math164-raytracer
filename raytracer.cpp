@@ -100,6 +100,10 @@ Color clamp_intensity(Color c) {
                  clamp_intensity(c.z()));
 }
 
+template <typename T> int sgn(T val) {
+    return (T(0) < val) - (val < T(0));
+}
+
 class Random {
     default_random_engine rand_engine;
     uniform_real_distribution<> uniform_rand;
@@ -248,7 +252,7 @@ protected:
         Color r_perp2_base = eta2kappa2 + cos_theta_i2;
         Color r_perp2 = (r_perp2_base - pm)/(r_perp2_base + pm);
 
-        return (clamp_intensity(r_para2) + clamp_intensity(r_perp2))/2;
+        return clamp_intensity((r_para2 + r_perp2)/2);
     };
 };
 
@@ -262,9 +266,9 @@ protected:
         double n_dot_m = n.dot(m);
         double sin_theta_m = sqrt(1 - n_dot_m * n_dot_m);
         double tan_theta_m = sin_theta_m / n_dot_m;
-        // if (n_dot_m < 0) {
-        //     return 0;
-        // }
+        if (n_dot_m <= 0) {
+            return 0;
+        }
 
         double alpha2 = this->alpha * this->alpha;
 
@@ -278,7 +282,7 @@ protected:
                           const Vector3d& n) const {
         double alpha2 = this->alpha * this->alpha;
         double n_dot_v=n.dot(v);
-        if (v.dot(m)/n_dot_v < 0) {
+        if (v.dot(m)/n_dot_v <= 0) {
             return 0;
         }
 
@@ -321,21 +325,10 @@ public:
     virtual double pdf(const Vector3d& wi,
                        const Vector3d& wo,
                        const Vector3d& normal) const override {
+        Vector3d m = (wi + wo).normalized();
 
-        Vector3d h = (wi + wo).normalized();
-
-        // double theta = acos(normal.dot(h));
-        // double cos_theta = cos(theta);
-        // double cos_theta2 = cos_theta * cos_theta;
-        // double sin_theta = sin(theta);
-        // double alpha2 = this->alpha * this->alpha;
-        // double denom = (alpha2 - 1) * cos_theta2 + 1;
-
-        // double pdf_h = alpha2 * cos_theta * sin_theta/(M_PI * denom * denom);
-        // return pdf_h * abs(normal.dot(h))/ (4 * wi.dot(h));
-
-        double p_m = microfacet_distribution(h, normal) * abs(normal.dot(h));
-        return p_m/(4 * wo.dot(h));
+        double p_m = microfacet_distribution(m, normal) * abs(normal.dot(m));
+        return p_m/abs(4 * wi.dot(m) * wi.dot(normal));
     };
 
     virtual Vector3d sample(const Vector3d& wo,
@@ -344,16 +337,19 @@ public:
         double xi1 = rand.unit_rand();
         double xi2 = rand.unit_rand();
 
+        double alpha2 = this->alpha * this->alpha;
         double phi = 2 * M_PI * xi1;
-        double theta = atan(this->alpha * sqrt(xi2/(1 - xi2)));
+        double cos_theta = sqrt((1 - xi2)/(xi2 * (alpha2 - 1) + 1));
+        double sin_theta = sqrt(1 - cos_theta * cos_theta);
 
-        double x = sin(theta) * cos(phi);
-        double y = sin(theta) * sin(phi);
-        double z = cos(theta);
+        double x = sin_theta * cos(phi);
+        double y = sin_theta * sin(phi);
+        double z = cos_theta;
 
         Vector3d m = this->to_world(x, y, z, normal).normalized();
+        Vector3d wi = 2 * abs(wo.dot(m)) * m - wo;
 
-        return 2 * wo.dot(m) * m - wo;
+        return wi;
     };
 };
 
@@ -431,7 +427,7 @@ struct Object {
 };
 
 typedef LambertBSDF_IS Diffuse;
-typedef GGXConductorBSDF Glossy;
+typedef GGXConductorBSDF_IS Glossy;
 
 Object scene_temp[] = {
     // left
@@ -460,14 +456,17 @@ Object scene_temp[] = {
 
     // mirror
     Object(move(make_unique<Sphere>(Sphere(16.5, Vector3d(27, 16.5, 47)))),
-           move(make_unique<Diffuse>(Diffuse(Color(1, 1, 1)*.999)))),
+           move(make_unique<Glossy>(Glossy(Color(1, 1, 1)*.999,
+                                           Color(0.155, 0.424, 1.383),
+                                           Color(3.602, 2.472, 1.916),
+                                           0.001)))),
 
     // glass
     Object(move(make_unique<Sphere>(Sphere(16.5, Vector3d(73, 16.5, 78)))),
            move(make_unique<Glossy>(Glossy(Color(1, 1, 1)*.999,
                                            Color(0.155, 0.424, 1.383),
                                            Color(3.602, 2.472, 1.916),
-                                           0.001)))),
+                                           0.03)))),
 
     // light
     Object(move(make_unique<Sphere>(Sphere(600, Vector3d(50, 681.6-.27, 81.6)))),
