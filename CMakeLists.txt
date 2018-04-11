@@ -1,0 +1,8 @@
+cmake_minimum_required(VERSION 3.10)
+project (raytracer)
+
+file(GLOB SOURCES "util/*.cpp" "material/*.cpp" "geometry/*.cpp" "raytrace/*.cpp")
+set(CMAKE_CXX_FLAGS "-std=c++17 -O3 -Wall -flto -fopenmp -march=native -mtune=native")
+add_executable(raytracer_png ${SOURCES} raytracer_png.cpp)
+target_link_libraries(raytracer_png sfml-window sfml-graphics sfml-system)
+add_executable(raytracer_ppm ${SOURCES} raytracer_ppm.cpp)

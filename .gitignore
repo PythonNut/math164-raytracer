@@ -1,2 +1,14 @@
-/raytracer
+/raytracer_png
+/raytracer_ppm
 /image.ppm
+/image.png
+
+CMakeCache.txt
+CMakeFiles
+CMakeScripts
+Testing
+Makefile
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+CTestTestfile.cmake
