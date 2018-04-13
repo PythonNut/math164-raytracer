@@ -30,7 +30,7 @@ double GGXConductorBSDF::shadow_masking(const Vector3d& v,
           return 0;
      }
 
-     double tan_theta_v = tan(acos(n_dot_v));
+     double tan_theta_v = sqrt(1 - n_dot_v * n_dot_v)/n_dot_v;
 
      return 2/(1 + sqrt(1 + alpha2 * tan_theta_v * tan_theta_v));
 }
