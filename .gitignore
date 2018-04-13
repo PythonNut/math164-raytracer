@@ -1,7 +1,9 @@
 /raytracer_png
 /raytracer_ppm
+/raytracer_progressive
 /image.ppm
 /image.png
+/image_progressive.png
 
 CMakeCache.txt
 CMakeFiles
