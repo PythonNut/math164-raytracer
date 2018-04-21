@@ -41,15 +41,15 @@ int main (int argc, char *argv[])
                     m(height-y-1, x) += r;
                }
           }
-          // ofstream out_file;
-          // out_file.open("imagePPM1.ppm");
-          // out_file << "P3" << endl << width << " " << height << endl << 255 << endl;
-          // for (int j=0; j<height; j++){
-          //      for (int i=0; i<width; i++) {
-          //           out_file << toPPM((m(j,i)).x()) << " " << toPPM((m(j,i)).y()) << " " << toPPM((m(j,i)).z()) << " ";
-          //      }
-          // }
-          // out_file.close();
+
+          string math = "output";
+          string var = to_string(s+1);
+          ofstream myfile;
+          myfile.open(math+var+".csv");
+          for(int count = 0; count < width*height; count ++){
+               myfile << m(count).x()/(s+1) << "\t"<< m(count).y()/(s+1) <<"\t" <<(m(count)).z()/(s+1)<<endl;
+          }
+          myfile.close();
      }
 
      ofstream out_file;
